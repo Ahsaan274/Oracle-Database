@@ -7,6 +7,7 @@
     tools:context=".WelcomePage">
 
     <TextView
+        android:id="@+id/abc"
         android:textSize="30dp"
         android:layout_marginTop="20dp"
         app:layout_constraintLeft_toLeftOf="parent"

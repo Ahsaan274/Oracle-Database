@@ -92,27 +92,6 @@
         android:textColor="#000"
         android:textSize="20dp"
         ></Button>
-    <TextView
-        android:textSize="20dp"
-        android:layout_marginTop="20dp"
-        android:text="Latitude"
-        android:id="@+id/Lat"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        app:layout_constraintTop_toBottomOf="@id/login"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        ></TextView>
-    <TextView
-        android:textSize="20dp"
-        android:text="Longitude"
-        android:id="@+id/Lng"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        app:layout_constraintTop_toBottomOf="@id/Lat"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        ></TextView>
 
     <TextView
         android:layout_width="wrap_content"

@@ -8,13 +8,16 @@ import android.Manifest;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.StrictMode;
+import android.preference.PreferenceManager;
 import android.provider.Settings;
+import android.provider.SyncStateContract;
 import android.text.Html;
 import android.util.Log;
 import android.view.View;
@@ -43,47 +46,54 @@ public class MainActivity extends AppCompatActivity {
     private static final String DEFAULT_URL = "jdbc:oracle:thin:@192.168.10.100:1521:odb";
     private static final String DEFAULT_USERNAME = "tApp";
     private static final String DEFAULT_PASSWORD = "101171";
-    private Connection connection;
 
+    private Connection connection;
+    public static String dataLatLng;
     LocationManager service;
     private FusedLocationProviderClient client;
     private static final int REQUEST_LOCATION = 1;
-
+    DatabaseHelper db;
     private boolean isNetworkOk;
     public static final String TAG = "MyTag";
     private TextView mLog;
     TextView forgetTxtView;
     Button btn ;
-    EditText edUserId, edUserName,edUserPass;
+    public String email,password;
+    public static EditText edUserId,edUserPass;
+    public static String KEY_EMAIL = "email";
+    public static String KEY_PASSWORD = "password";
+
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        btn = findViewById(R.id.login);
-        edUserId = findViewById(R.id.userId);
-        edUserPass = findViewById(R.id.password);
-        forgetTxtView = findViewById(R.id.forgetPass);
-        forgetTxtView.setText(Html.fromHtml("<i><u>Forget Password</u></i>?   "));
-        //  mLog = findViewById(R.id.chkInternet);
-        client = LocationServices.getFusedLocationProviderClient(this);
 
+        initView();
+        getLongLat();
         NetworkIsConnected();
         requestPermission();
         showGpsSettings(this);
-        getLongLat();
+        CheckConnection();
 
-
-        if (android.os.Build.VERSION.SDK_INT > 15) {
-            StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
-            StrictMode.setThreadPolicy(policy);
+        if (CheckFile()) {
+            UserAuthentication();
         }
         btn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                LoginValid();
+                email = edUserId.getText().toString();
+                password = edUserPass.getText().toString();
+                if (LoginValid(email,password) == true){
+                    saveEmailAndPassword(email,password);
+                    Intent intent = new Intent(MainActivity.this,WelcomePage.class);
+                    startActivity(intent);
+                }
             }
         });
+    }
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    private void CheckConnection() {
         try {
             this.connection = createConnection();
         }
@@ -91,12 +101,58 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(MainActivity.this, ""+e,Toast.LENGTH_SHORT).show();
             e.printStackTrace();
         }
-    }
-    private void logOutput(String data){
-        Log.d(TAG,"logOutput:"+data);
-        mLog.setText(data+"\n");
+
     }
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    public void initView(){
+        if (android.os.Build.VERSION.SDK_INT > 15) {
+            StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
+            StrictMode.setThreadPolicy(policy);
+        }
+        btn = findViewById(R.id.login);
+        edUserId = findViewById(R.id.userId);
+        edUserPass = findViewById(R.id.password);
+        email = edUserId.getText().toString();
+        password = edUserPass.getText().toString();
+        forgetTxtView = findViewById(R.id.forgetPass);
+        forgetTxtView.setText(Html.fromHtml("<i><u>Forget Password</u></i>?   "));
+        db = new DatabaseHelper(this);
+        client = LocationServices.getFusedLocationProviderClient(this);
+    }
+    public void UserAuthentication(){
+        if (getEmailAndPassword(this) != null ){
+            if (LoginValid(email,password)) {
+                Intent intent = new Intent(MainActivity.this, WelcomePage.class);
+                startActivity(intent);
+            }
+        }else{
+
+        }
+    }
+    public String[] getEmailAndPassword(Context context) {
+        SharedPreferences prefs = getSharedPreferences("com.example.oracle",Context.MODE_PRIVATE);//PreferenceManager.getDefaultSharedPreferences(context);
+        return new String[]{prefs.getString(KEY_EMAIL,""),prefs.getString(KEY_PASSWORD,"")};
+    }
+    public boolean saveEmailAndPassword(String email, String password) {
+        SharedPreferences prefs = getSharedPreferences("com.example.oracle",Context.MODE_PRIVATE);//PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
+        SharedPreferences.Editor prefsEditor = prefs.edit();
+        prefsEditor.putString(KEY_EMAIL, email);
+        prefsEditor.putString(KEY_PASSWORD, password);
+        prefsEditor.commit();
+        Toast.makeText(this, "Data Save Successfull", Toast.LENGTH_SHORT).show();
+        return true;
+    }
+    public boolean CheckFile() {
+        SharedPreferences prefs = getSharedPreferences("com.example.oracle",Context.MODE_PRIVATE);
+        email = prefs.getString(KEY_EMAIL,"");
+        password = prefs.getString(KEY_PASSWORD,"");
+        if (!(email.equals("") && password.equals(""))) {
+            return true;
+        }
+        else {
+            return  false;
+        }
+    }
     private void NetworkIsConnected() {
         isNetworkOk = NetworkHelper.isNetworkAvailable(this);
         if(isNetworkOk == true){
@@ -122,37 +178,38 @@ public class MainActivity extends AppCompatActivity {
 
         }
     }
-
-    public void LoginValid(){
+    public boolean LoginValid(String email,String password){
         try {
             CallableStatement callableStatement;
-            callableStatement = connection.prepareCall("call signin(?,?,?)");
-
-            callableStatement.setString(1,edUserId.getText().toString());
-            //callableStatement.setString(2,edUserName.getText().toString());
-            callableStatement.setString(2,edUserPass.getText().toString());
-            callableStatement.registerOutParameter(3, Types.VARCHAR);
+            callableStatement = connection.prepareCall("call signin(?,?,?,?)");
+            callableStatement.setString("vUserId",email);
+            callableStatement.setString("vPassword",password);
+            callableStatement.setString("vLatLng",dataLatLng);
+            callableStatement.registerOutParameter("retval", Types.VARCHAR);
             callableStatement.execute();
-            if (!callableStatement.getString(3).equals("False")){
+            if (!callableStatement.getString("retval").equals("False")){
                 Toast.makeText(MainActivity.this, "Successfully LogIn", Toast.LENGTH_SHORT).show();
-                Intent intent = new Intent(MainActivity.this,WelcomePage.class);
-                startActivity(intent);
-                finish();
-                return;
+               /* Intent intent = new Intent(MainActivity.this,WelcomePage.class);
+                startActivity(intent);*/
+                return true;
             }
             else if(edUserId.getText().toString().equals("")){
                 edUserId.setError("Can't be empty");
+                return false;
             }
             else if(edUserPass.getText().toString().equals("")){
                 edUserPass.setError("Can't be empty");
+                return false;
             }
             else {
                 Toast.makeText(MainActivity.this, "Invalid Email & Password", Toast.LENGTH_SHORT).show();
+                return false;
             }
 
         } catch (SQLException e) {
             e.printStackTrace();
         }
+        return true;
     }
     public static Connection createConnection(String driver, String url, String username, String password) throws ClassNotFoundException, SQLException {
         Class.forName(driver);
@@ -161,16 +218,13 @@ public class MainActivity extends AppCompatActivity {
     public static Connection createConnection() throws ClassNotFoundException, SQLException {
         return createConnection(DEFAULT_DRIVER, DEFAULT_URL, DEFAULT_USERNAME, DEFAULT_PASSWORD);
     }
-    private void getLongLat() {
+    private void getLongLat(){
         client.getLastLocation().addOnSuccessListener(MainActivity.this, new OnSuccessListener<Location>() {
             @RequiresApi(api = Build.VERSION_CODES.M)
             @Override
             public void onSuccess(Location location) {
                 if (location != null) {
-                    TextView txtV = findViewById(R.id.Lat);
-                    txtV.setText(valueOf("T: "+location.getLatitude()));
-                    TextView txtV2 = findViewById(R.id.Lng);
-                    txtV2.setText(valueOf("G: "+location.getLongitude()));
+                    dataLatLng =location.getLatitude() +","+ location.getLongitude();
                 }
             }
         });
@@ -204,7 +258,7 @@ public class MainActivity extends AppCompatActivity {
             getDeviceLoc();
         }
     }
-    private Location getDeviceLoc() {
+    private Location getDeviceLoc(){
         if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission
                 (MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {

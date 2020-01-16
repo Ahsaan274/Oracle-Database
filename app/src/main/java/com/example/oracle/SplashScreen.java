@@ -16,7 +16,7 @@ public class SplashScreen extends AppCompatActivity {
             @Override
             public void run() {
                 //Do any action here. Now we are moving to next page
-                Intent mySuperIntent = new Intent(getApplicationContext(),MainActivity.class);
+                Intent mySuperIntent = new Intent(getApplicationContext(),LoginActivity.class);
                 startActivity(mySuperIntent);
                 finish();
             }

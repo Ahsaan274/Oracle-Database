@@ -1,3 +1,4 @@
 <resources>
-    <string name="app_name">OracleDB</string>
+    <string name="app_name">NubitSoft</string>
+    <string name="logout">Logout</string>
 </resources>
